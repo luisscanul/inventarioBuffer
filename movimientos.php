@@ -1,115 +1,126 @@
+<?php
+include 'conexion.php'; 
+
+// Consulta para el historial de movimientos
+// Unimos Movimientos -> Productos -> Clasificaciones (para el Nombre)
+// Y Movimientos -> Usuarios (para el Nombre del usuario)
+$query = "SELECT 
+            M.IDMOVIMIENTO,
+            C.NOMBRE AS NOMBRE_PRODUCTO,
+            M.TIPO_MOVIMIENTO,
+            M.CANTIDAD,
+            M.FECHA,
+            U.NOMBRE AS NOMBRE_USUARIO
+          FROM MOVIMIENTOS M
+          INNER JOIN PRODUCTOS P ON M.IDPRODUCTO = P.IDPRODUCTO
+          INNER JOIN CLASIFICACIONES C ON P.IDCLASIFICACION = C.IDCLASIFICACION
+          INNER JOIN USUARIOS U ON M.IDUSUARIO = U.IDUSUARIO
+          ORDER BY M.FECHA DESC";
+
+$resultado = sqlsrv_query($conn, $query);
+
+if ($resultado === false) {
+    die(print_r(sqlsrv_errors(), true));
+}
+?>
+
 <!DOCTYPE html>
 <html lang="es">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Movimientos</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-        <link rel="stylesheet" href="css/panel.css">
-    </head>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movimientos - Buff</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/panel.css">
+</head>
+<body>
+    <?php include 'header.php'; ?>
 
-    <body>
-        <?php include 'header.php'; ?>
-
-        <div class="container mt-4">
-
-        <div class="card panel">
-        <h5>Registro de Movimiento</h5>
-
-        <div class="row g-3 mt-2">
-
-        <div class="col-md-4">
-        <label class="form-label">Escaneo código de barras</label>
-        <input type="text" class="form-control">
+    <div class="container mt-4 mb-5">
+        <div class="card panel p-4 shadow-sm">
+            <h5 class="text-primary mb-3">📋 Registro de Movimiento</h5>
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Tipo de movimiento</label>
+                    <select class="form-select">
+                        <option value="Entrada">Entrada</option>
+                        <option value="Salida">Salida</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Cantidad</label>
+                    <input type="number" class="form-control" min="1">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Fecha</label>
+                    <input type="date" class="form-control" value="<?php echo date('Y-m-d'); ?>">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">ID Usuario Operador</label>
+                    <input type="text" class="form-control">
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button class="btn btn-primary w-100 fw-bold">Registrar movimiento</button>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button class="btn btn-light w-100 border">Cancelar</button>
+                </div>
+            </div>
         </div>
 
-        <div class="col-md-3">
-        <label class="form-label">Tipo de movimiento</label>
-        <select class="form-control">
-        <option>Entrada</option>
-        <option>Salida</option>
-        </select>
-        </div>
+        <div class="card panel mt-4 p-4 shadow-sm">
+            <h5 class="mb-4">🕒 Historial de Movimientos</h5>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Producto</th>
+                            <th>Tipo</th>
+                            <th>Cantidad</th>
+                            <th>Fecha y Hora</th>
+                            <th>Responsable</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    <?php while ($fila = sqlsrv_fetch_array($resultado, SQLSRV_FETCH_ASSOC)): 
+        // Convertimos a mayúsculas y quitamos espacios por seguridad
+        $tipo = strtoupper(trim($fila['TIPO_MOVIMIENTO']));
 
-        <div class="col-md-2">
-        <label class="form-label">Cantidad</label>
-        <input type="number" class="form-control">
-        </div>
-
-        <div class="col-md-3">
-        <label class="form-label">Fecha</label>
-        <input type="date" class="form-control">
-        </div>
-
-        <div class="col-md-4">
-        <label class="form-label">Usuario</label>
-        <input type="text" class="form-control">
-        </div>
-
-        <div class="col-md-4 d-flex align-items-end">
-        <button class="btn btn-success w-100">Registrar movimiento</button>
-        </div>
-
-        <div class="col-md-4 d-flex align-items-end">
-        <button class="btn btn-secondary w-100">Cancelar</button>
-        </div>
-
-        </div>
-        </div>
-
-        <div class="card panel mt-4">
-        <h5>Historial de Movimientos</h5>
-
-        <table class="table table-striped mt-3">
-
-        <thead>
+        if ($tipo === 'ENTRADA') {
+            $claseTexto = 'text-primary'; // Azul para el número
+            $signo = '+';
+            $badgeColor = 'bg-primary'; 
+        } else {
+            $claseTexto = 'text-danger';  // Rojo para el número
+            $signo = '-';
+            $badgeColor = 'bg-danger';
+        }
+    ?>
         <tr>
-        <th>Producto</th>
-        <th>Tipo movimiento</th>
-        <th>Cantidad</th>
-        <th>Fecha</th>
-        <th>Usuario</th>
+            <td><strong><?php echo $fila['NOMBRE_PRODUCTO']; ?></strong></td>
+            <td>
+                <span class="badge <?php echo $badgeColor; ?> px-3">
+                    <?php echo $tipo; ?>
+                </span>
+            </td>
+            <td class="fw-bold <?php echo $claseTexto; ?>" style="font-size: 1.1rem;">
+                <?php echo $signo . ' ' . $fila['CANTIDAD']; ?>
+            </td>
+            <td>
+                <?php echo $fila['FECHA']->format('d/m/Y'); ?>
+            </td>
+            <td>
+                <div class="d-flex align-items-center">
+                    <span class="me-2">👤</span>
+                    <?php echo $fila['NOMBRE_USUARIO']; ?>
+                </div>
+            </td>
         </tr>
-        </thead>
-
-        <tbody>
-
-        <tr>
-        <td>producto1</td>
-        <td>Entrada</td>
-        <td>20</td>
-        <td>10/03/2026</td>
-        <td>usuario1</td>
-        </tr>
-
-        <tr>
-        <td>producto2</td>
-        <td>Salida</td>
-        <td>5</td>
-        <td>09/03/2026</td>
-        <td>usuario2</td>
-        </tr>
-
-        <tr>
-        <td>producto3</td>
-        <td>Entrada</td>
-        <td>15</td>
-        <td>08/03/2026</td>
-        <td>usuario3</td>
-        </tr>
-
-        <tr>
-        <td>producto4</td>
-        <td>Salida</td>
-        <td>3</td>
-        <td>07/03/2026</td>
-        <td>usuario1</td>
-        </tr>
-
-        </tbody>
-        </table>
+    <?php endwhile; ?>
+</tbody>
+                </table>
+            </div>
         </div>
-        </div>
-
-    </body>
+    </div>
+</body>
 </html>
