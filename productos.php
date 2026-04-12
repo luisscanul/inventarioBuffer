@@ -2,7 +2,7 @@
 include 'conexion.php'; 
 
 /**
- * CONSULTA PARA LA TABLA (Con JOIN para el nombre)
+ * CONSULTA PARA LA TABLA (Con JOIN para el nombre de categoría y LEFT JOIN para stock)
  */
 $sql = "SELECT 
             p.IDPRODUCTO, 
@@ -32,7 +32,7 @@ if ($res === false) {
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Productos - Sistema Buff</title>
+    <title>Productos</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="css/panel.css">
     <style>
@@ -47,12 +47,11 @@ if ($res === false) {
 
     <div class="container mt-4">
         <div class="card panel p-4 shadow-sm border-0">
-            <h5 class="text-primary mb-3">📦 Registro de Producto</h5>
+            <h5 class="text-primary mb-3">Registro de Nuevo Producto</h5>
             <form action="insertar_producto.php" method="POST">
                 <div class="row g-3">
-                    
                     <div class="col-md-5">
-                        <label class="form-label fw-bold">Nombre o Categoría</label>
+                        <label class="form-label fw-bold">Categoría</label>
                         <select name="id_clasificacion" class="form-select" required>
                             <option value="" selected disabled>Seleccione una categoría...</option>
                             <?php while($cat = sqlsrv_fetch_array($res_cat, SQLSRV_FETCH_ASSOC)): ?>
@@ -64,7 +63,7 @@ if ($res === false) {
                     </div>
 
                     <div class="col-md-2">
-                        <label class="form-label fw-bold">Clasificación</label>
+                        <label class="form-label fw-bold">Clasificación ABC</label>
                         <select name="clasificacion_abc" class="form-select">
                             <option value="A">A</option>
                             <option value="B">B</option>
@@ -81,7 +80,7 @@ if ($res === false) {
                     </div>
 
                     <div class="col-md-3">
-                        <label class="form-label fw-bold">Estatus</label>
+                        <label class="form-label fw-bold">Estatus Inicial</label>
                         <select name="estatus" class="form-select">
                             <option value="ACTIVO">ACTIVO</option>
                             <option value="INACTIVO">INACTIVO</option>
@@ -89,7 +88,7 @@ if ($res === false) {
                     </div>
 
                     <div class="col-md-12 text-end mt-3">
-                        <button type="submit" class="btn btn-success px-5 fw-bold">Agregar Producto</button>
+                        <button type="submit" class="btn btn-success px-5 fw-bold">Guardar Producto</button>
                     </div>
                 </div>
             </form>
@@ -103,7 +102,7 @@ if ($res === false) {
                             <th>ID</th>
                             <th>Nombre (Categoría)</th>
                             <th>Valor Unitario</th>
-                            <th class="text-center">Clasificacion</th>
+                            <th class="text-center">ABC</th>
                             <th>Stock</th>
                             <th>Estatus</th>
                             <th class="text-center">Acciones</th>
@@ -112,11 +111,14 @@ if ($res === false) {
                     <tbody>
                         <?php while($row = sqlsrv_fetch_array($res, SQLSRV_FETCH_ASSOC)): 
                             $abc = trim($row['CLASIFICACION_ABC'] ?? 'C');
+                            $id = $row['IDPRODUCTO'];
+                            $valor = $row['VALOR_UNITARIO'];
+                            $estatus = trim($row['ESTATUS']);
                         ?>
                         <tr>
-                            <td><small class="text-muted">#<?php echo $row['IDPRODUCTO']; ?></small></td>
+                            <td><small class="text-muted">#<?php echo $id; ?></small></td>
                             <td><strong><?php echo $row['CATEGORIA_NOMBRE']; ?></strong></td>
-                            <td>$<?php echo number_format($row['VALOR_UNITARIO'], 2); ?></td>
+                            <td>$<?php echo number_format($valor, 2); ?></td>
                             <td class="text-center">
                                 <span class="badge-abc abc-<?php echo $abc; ?>">
                                     <?php echo $abc; ?>
@@ -128,13 +130,19 @@ if ($res === false) {
                                 </span>
                             </td>
                             <td>
-                                <span class="badge <?php echo (trim($row['ESTATUS']) == 'ACTIVO') ? 'bg-success' : 'bg-secondary'; ?>">
-                                    <?php echo $row['ESTATUS']; ?>
+                                <span class="badge <?php echo ($estatus == 'ACTIVO') ? 'bg-success' : 'bg-secondary'; ?>">
+                                    <?php echo $estatus; ?>
                                 </span>
                             </td>
                             <td class="text-center">
-                                <button class="btn btn-sm btn-warning">Editar</button>
-                                <button class="btn btn-sm btn-danger">Eliminar</button>
+                                <button class="btn btn-sm btn-warning fw-bold" 
+                                        onclick="prepararEdicion(<?php echo $id; ?>, <?php echo $valor; ?>, '<?php echo $estatus; ?>')">
+                                    Editar
+                                </button>
+                                <button class="btn btn-sm btn-danger fw-bold" 
+                                        onclick="eliminarProducto(<?php echo $id; ?>, this)">
+                                    Eliminar
+                                </button>
                             </td>
                         </tr>
                         <?php endwhile; ?>
@@ -143,5 +151,38 @@ if ($res === false) {
             </div>
         </div>
     </div>
+
+    <div class="modal fade" id="modalEditar" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form id="formEditar" action="editar_producto.php" method="POST" class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title">Editar Producto #<span id="edit_id_label"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="id" id="edit_id">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Valor Unitario</label>
+                        <input type="number" step="0.01" name="valor" id="edit_valor" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Estatus</label>
+                        <select name="estatus" id="edit_estatus" class="form-select">
+                            <option value="ACTIVO">ACTIVO</option>
+                            <option value="INACTIVO">INACTIVO</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="submit" class="btn btn-primary">Actualizar Datos</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/acciones.js"></script>
 </body>
 </html>

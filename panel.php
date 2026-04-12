@@ -7,7 +7,7 @@ include 'conexion.php';
 $resTotal = sqlsrv_query($conn, "SELECT COUNT(*) as total FROM PRODUCTOS");
 $rowTotal = sqlsrv_fetch_array($resTotal, SQLSRV_FETCH_ASSOC);
 
-// Stock bajo (Ejemplo: menor a 10 unidades)
+// Stock bajo (Ejemplo: menor a 10 unidades)    
 $resBajo = sqlsrv_query($conn, "SELECT COUNT(*) as bajo FROM INVENTARIO WHERE STOCK < STOCK_MINIMO");
 $rowBajo = sqlsrv_fetch_array($resBajo, SQLSRV_FETCH_ASSOC);
 
@@ -21,7 +21,7 @@ $rowCritico = sqlsrv_fetch_array($resCritico, SQLSRV_FETCH_ASSOC);
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Panel Principal - Sistema Buff</title>
+        <title>Panel Principal</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
         <link rel="stylesheet" href="css/panel.css">
     </head>

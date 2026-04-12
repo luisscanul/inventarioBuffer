@@ -1,46 +1,84 @@
 <?php
 include 'conexion.php';
 
-$tipo = isset($_GET['tipo']) ? $_GET['tipo'] : 'historial';
+// Capturamos los datos del GET que envía el Fetch de reportes.php
+$tipo = $_GET['tipo'] ?? 'historial';
+$inicio = $_GET['inicio'] ?? '';
+$fin = $_GET['fin'] ?? '';
+$producto = $_GET['producto'] ?? '';
 
+$params = array();
+$where_filtros = "";
+
+// 1. Construir filtros dinámicos (solo si el usuario los llenó)
+if (!empty($producto)) {
+    // Nota: Usamos alias 'P' o 'M' dependiendo de la tabla en el switch
+    $where_filtros .= " AND P.IDPRODUCTO = ? ";
+    $params[] = $producto;
+}
+
+if (!empty($inicio) && !empty($fin)) {
+    $where_filtros .= " AND M.FECHA BETWEEN ? AND ? ";
+    $params[] = $inicio . " 00:00:00";
+    $params[] = $fin . " 23:59:59";
+}
+
+// 2. Definir la consulta según el tipo de reporte
 switch ($tipo) {
     case 'stock':
-        // Reporte de Inventario Completo
+        // En Stock y Alertas no filtramos por fecha (porque es una foto del momento actual)
+        $where_stock = !empty($producto) ? " WHERE P.IDPRODUCTO = ?" : "";
+        $p_stock = !empty($producto) ? array($producto) : array();
+        
         $query = "SELECT C.NOMBRE, C.DESCRIPCION, I.STOCK, I.STOCK_MINIMO, P.VALOR_UNITARIO 
                   FROM INVENTARIO I
                   INNER JOIN PRODUCTOS P ON I.IDPRODUCTO = P.IDPRODUCTO
-                  INNER JOIN CLASIFICACIONES C ON P.IDCLASIFICACION = C.IDCLASIFICACION";
+                  INNER JOIN CLASIFICACIONES C ON P.IDCLASIFICACION = C.IDCLASIFICACION
+                  $where_stock";
+        $res = sqlsrv_query($conn, $query, $p_stock);
         break;
 
     case 'alertas':
-        // Solo productos por debajo del mínimo
+        $where_alertas = " WHERE I.STOCK <= I.STOCK_MINIMO ";
+        $p_alertas = array();
+        if (!empty($producto)) {
+            $where_alertas .= " AND P.IDPRODUCTO = ? ";
+            $p_alertas[] = $producto;
+        }
+
         $query = "SELECT C.NOMBRE, I.STOCK, I.STOCK_MINIMO, 
                   CASE WHEN I.STOCK <= 0 THEN 'CRÍTICA' WHEN I.STOCK <= (I.STOCK_MINIMO/2) THEN 'MEDIA' ELSE 'BAJA' END AS NIVEL
                   FROM INVENTARIO I
                   INNER JOIN PRODUCTOS P ON I.IDPRODUCTO = P.IDPRODUCTO
                   INNER JOIN CLASIFICACIONES C ON P.IDCLASIFICACION = C.IDCLASIFICACION
-                  WHERE I.STOCK <= I.STOCK_MINIMO";
+                  $where_alertas";
+        $res = sqlsrv_query($conn, $query, $p_alertas);
         break;
 
-    default:
-        // Entradas, Salidas o Historial (basados en Movimientos)
-        $where = "";
-        if ($tipo == 'entradas') $where = "WHERE M.TIPO_MOVIMIENTO = 'ENTRADA'";
-        if ($tipo == 'ventas') $where = "WHERE M.TIPO_MOVIMIENTO = 'SALIDA'";
+    default: // Ventas, Entradas e Historial
+        $condicion_tipo = "";
+        if ($tipo == 'entradas') $condicion_tipo = " AND M.TIPO_MOVIMIENTO = 'ENTRADA'";
+        if ($tipo == 'ventas') $condicion_tipo = " AND M.TIPO_MOVIMIENTO = 'SALIDA'";
         
         $query = "SELECT C.NOMBRE, M.TIPO_MOVIMIENTO, M.CANTIDAD, M.FECHA, U.NOMBRE AS USUARIO 
                   FROM MOVIMIENTOS M
                   INNER JOIN PRODUCTOS P ON M.IDPRODUCTO = P.IDPRODUCTO
                   INNER JOIN CLASIFICACIONES C ON P.IDCLASIFICACION = C.IDCLASIFICACION
                   INNER JOIN USUARIOS U ON M.IDUSUARIO = U.IDUSUARIO
-                  $where ORDER BY M.FECHA DESC";
+                  WHERE 1=1 $condicion_tipo $where_filtros 
+                  ORDER BY M.FECHA DESC";
+        $res = sqlsrv_query($conn, $query, $params);
         break;
 }
 
-$res = sqlsrv_query($conn, $query);
+if ($res === false) {
+    die("<tr><td colspan='5'>Error en consulta: ".print_r(sqlsrv_errors(), true)."</td></tr>");
+}
 
-// Renderizado dinámico según el tipo
+// 3. Renderizado de la tabla (Exactamente como lo tenías, está perfecto)
+$hay_datos = false;
 while ($f = sqlsrv_fetch_array($res, SQLSRV_FETCH_ASSOC)) {
+    $hay_datos = true;
     if ($tipo == 'stock') {
         echo "<tr>
                 <td><strong>{$f['NOMBRE']}</strong></td>
@@ -65,9 +103,13 @@ while ($f = sqlsrv_fetch_array($res, SQLSRV_FETCH_ASSOC)) {
                 <td><strong>{$f['NOMBRE']}</strong></td>
                 <td><span class='badge $badge'>$tipo_m</span></td>
                 <td class='fw-bold $clase'>".(($tipo_m == 'ENTRADA') ? '+' : '-')." {$f['CANTIDAD']}</td>
-                <td>".$f['FECHA']->format('d/m/Y')."</td>
+                <td>".$f['FECHA']->format('d/m/Y H:i')."</td>
                 <td>👤 {$f['USUARIO']}</td>
               </tr>";
     }
+}
+
+if (!$hay_datos) {
+    echo "<tr><td colspan='5' class='text-center text-muted'>No se encontraron registros con los filtros seleccionados.</td></tr>";
 }
 ?>

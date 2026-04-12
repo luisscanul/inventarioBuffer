@@ -1,8 +1,11 @@
 <?php
 include 'conexion.php';
 
-// Consulta base para mostrar información general en la tabla (Historial reciente)
-$query = "SELECT TOP 10
+/**
+ * Consulta inicial: Mostramos los últimos 10 movimientos por defecto 
+ * para que la tabla no aparezca vacía al cargar.
+ */
+$query_inicial = "SELECT TOP 10
             C.NOMBRE AS NOMBRE_PRODUCTO,
             M.TIPO_MOVIMIENTO,
             M.CANTIDAD,
@@ -14,7 +17,7 @@ $query = "SELECT TOP 10
           INNER JOIN USUARIOS U ON M.IDUSUARIO = U.IDUSUARIO
           ORDER BY M.FECHA DESC";
 
-$resultado = sqlsrv_query($conn, $query);
+$resultado_inicial = sqlsrv_query($conn, $query_inicial);
 ?>
 
 <!DOCTYPE html>
@@ -40,6 +43,15 @@ $resultado = sqlsrv_query($conn, $query);
         .report-card.active {
             background-color: #e7f1ff;
             border-color: #0d6efd;
+            box-shadow: 0 0 10px rgba(13, 110, 253, 0.2);
+        }
+        /* Optimización para impresión */
+        @media print {
+            .no-print, .report-card, .btn, .form-label, .form-control, .form-select, h5.text-primary {
+                display: none !important;
+            }
+            .container { width: 100%; max-width: 100%; }
+            .card { border: none !important; shadow: none !important; }
         }
     </style>
 </head>
@@ -47,54 +59,61 @@ $resultado = sqlsrv_query($conn, $query);
     <?php include 'header.php'; ?>
 
     <div class="container mt-4 mb-5">
-        <div class="card panel p-4 shadow-sm">
+        <div class="card panel p-4 shadow-sm no-print">
             <h5 class="text-primary mb-3">🛠️ Filtros de Reporte</h5>
             <div class="row g-3">
                 <div class="col-md-3">
-                    <label class="form-label">Fecha inicio</label>
-                    <input type="date" class="form-control">
+                    <label class="form-label fw-bold">Fecha inicio</label>
+                    <input type="date" id="f_inicio" class="form-control">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">Fecha fin</label>
-                    <input type="date" class="form-control">
+                    <label class="form-label fw-bold">Fecha fin</label>
+                    <input type="date" id="f_fin" class="form-control">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">Producto</label>
-                    <select class="form-select">
-                        <option>Todos los productos</option>
+                    <label class="form-label fw-bold">Producto</label>
+                    <select id="f_producto" class="form-select">
+                        <option value="">Todos los productos</option>
+                        <?php
+                        $q_p = "SELECT P.IDPRODUCTO, C.NOMBRE FROM PRODUCTOS P INNER JOIN CLASIFICACIONES C ON P.IDCLASIFICACION = C.IDCLASIFICACION";
+                        $res_p = sqlsrv_query($conn, $q_p);
+                        while($p = sqlsrv_fetch_array($res_p, SQLSRV_FETCH_ASSOC)) {
+                            echo "<option value='".$p['IDPRODUCTO']."'>".$p['NOMBRE']."</option>";
+                        }
+                        ?>
                     </select>
                 </div>
                 <div class="col-md-3 d-flex align-items-end gap-2">
-                    <button class="btn btn-success w-100">Generar</button>
-                    <button class="btn btn-danger w-50">PDF</button>
-                    <button class="btn btn-primary w-50">Excel</button>
+                    <button class="btn btn-success w-100 fw-bold" onclick="ejecutarFiltro()">Generar</button>
+                    <button class="btn btn-danger w-50" onclick="window.print()">Imprimir</button>
                 </div>
             </div>
         </div>
 
-        <div class="mt-4">
+        <div class="mt-4 no-print">
             <h5 class="mb-3">Seleccione el Tipo de Reporte</h5>
-            <div class="row g-3">
-    <div class="col-md-2 offset-md-1"> <div class="card report-card text-center p-3"><h6>Ventas</h6></div>
-    </div>
-    <div class="col-md-2">
-        <div class="card report-card text-center p-3"><h6>Entradas</h6></div>
-    </div>
-    <div class="col-md-2">
-        <div class="card report-card text-center p-3"><h6>Historial</h6></div>
-    </div>
-    <div class="col-md-2">
-        <div class="card report-card text-center p-3"><h6>Stock Actual</h6></div>
-    </div>
-    <div class="col-md-2">
-        <div class="card report-card text-center p-3"><h6>Alertas</h6></div>
-    </div>
-</div>
+            <div class="row g-3 justify-content-center">
+                <div class="col-md-2"> 
+                    <div class="card report-card text-center p-3 active" data-tipo="historial"><h6>Historial</h6></div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card report-card text-center p-3" data-tipo="ventas"><h6>Ventas</h6></div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card report-card text-center p-3" data-tipo="entradas"><h6>Entradas</h6></div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card report-card text-center p-3" data-tipo="stock"><h6>Stock Actual</h6></div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card report-card text-center p-3" data-tipo="alertas"><h6>Alertas</h6></div>
+                </div>
+            </div>
         </div>
 
         <div class="card panel mt-4 p-4 shadow-sm">
-            <h5 class="mb-4">📊 Vista previa del Reporte</h5>
-            <div class="table-responsive">
+            <h5 class="mb-4">📊 Vista previa del Reporte: <span id="titulo-reporte" class="text-muted">Historial Reciente</span></h5>
+            <div class="table-responsive" id="area-reporte">
                 <table class="table table-hover align-middle">
                     <thead class="table-dark" id="thead-reporte">
                         <tr>
@@ -106,23 +125,16 @@ $resultado = sqlsrv_query($conn, $query);
                         </tr>
                     </thead>
                     <tbody id="tabla-reporte-body">
-                        <?php while ($fila = sqlsrv_fetch_array($resultado, SQLSRV_FETCH_ASSOC)): 
+                        <?php while ($fila = sqlsrv_fetch_array($resultado_inicial, SQLSRV_FETCH_ASSOC)): 
                             $tipo = strtoupper(trim($fila['TIPO_MOVIMIENTO']));
                             $colorNum = ($tipo === 'ENTRADA') ? 'text-primary' : 'text-danger';
-                            $signo = ($tipo === 'ENTRADA') ? '+' : '-';
                         ?>
                             <tr>
                                 <td><strong><?php echo $fila['NOMBRE_PRODUCTO']; ?></strong></td>
-                                <td>
-                                    <span class="badge <?php echo ($tipo === 'ENTRADA') ? 'bg-primary' : 'bg-danger'; ?>">
-                                        <?php echo $tipo; ?>
-                                    </span>
-                                </td>
-                                <td class="fw-bold <?php echo $colorNum; ?>">
-                                    <?php echo $signo . ' ' . $fila['CANTIDAD']; ?>
-                                </td>
+                                <td><span class="badge <?php echo ($tipo === 'ENTRADA') ? 'bg-primary' : 'bg-danger'; ?>"><?php echo $tipo; ?></span></td>
+                                <td class="fw-bold <?php echo $colorNum; ?>"><?php echo $fila['CANTIDAD']; ?></td>
                                 <td><?php echo $fila['FECHA']->format('d/m/Y H:i'); ?></td>
-                                <td><small>👤 <?php echo $fila['NOMBRE_USUARIO']; ?></small></td>
+                                <td>👤 <?php echo $fila['NOMBRE_USUARIO']; ?></td>
                             </tr>
                         <?php endwhile; ?>
                     </tbody>
@@ -130,52 +142,64 @@ $resultado = sqlsrv_query($conn, $query);
             </div>
         </div>
     </div>
-</body>
-</html>
 
-<script>
-function cargarReporte(tipo) {
-    const thead = document.getElementById("thead-reporte"); // Cambiado a getElementById
-    const tbody = document.getElementById("tabla-reporte-body");
-    
-    if(!thead || !tbody) return; // Validación de seguridad
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
-    // Cambiar encabezados según el reporte
-    if (tipo === 'stock') {
-        thead.innerHTML = '<tr><th>Producto</th><th>Descripción</th><th>Stock Actual</th><th>Mínimo</th><th>Precio</th></tr>';
-    } else if (tipo === 'alertas') {
-        thead.innerHTML = '<tr><th>Producto</th><th>Estado Actual</th><th>Mínimo</th><th>Nivel Alerta</th></tr>';
-    } else {
-        thead.innerHTML = '<tr><th>Producto</th><th>Movimiento</th><th>Cantidad</th><th>Fecha</th><th>Usuario</th></tr>';
+    <script>
+    let tipoSeleccionado = 'historial';
+
+    function ejecutarFiltro() {
+        cargarReporte(tipoSeleccionado);
     }
 
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center">Procesando información...</td></tr>';
-
-    // Llamada al archivo que creamos antes
-    fetch(`obtener_reporte.php?tipo=${tipo}`)
-        .then(r => {
-            if (!r.ok) throw new Error('Error en la red');
-            return r.text();
-        })
-        .then(data => { 
-            tbody.innerHTML = data; 
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error al cargar los datos</td></tr>';
-        });
-}
-
-// Configuración de las tarjetas
-document.querySelectorAll('.report-card').forEach((card, index) => {
-    const tipos = ['ventas', 'entradas', 'historial', 'stock', 'alertas'];
-    card.addEventListener('click', () => {
-        // Efecto visual de selección
-        document.querySelectorAll('.report-card').forEach(c => c.classList.remove('active', 'border-primary'));
-        card.classList.add('active', 'border-primary');
+    function cargarReporte(tipo) {
+        tipoSeleccionado = tipo;
+        const thead = document.getElementById("thead-reporte");
+        const tbody = document.getElementById("tabla-reporte-body");
+        const titulo = document.getElementById("titulo-reporte");
         
-        // Ejecutar carga
-        cargarReporte(tipos[index]);
+        // Capturar valores de los filtros
+        const inicio = document.getElementById("f_inicio").value;
+        const fin = document.getElementById("f_fin").value;
+        const producto = document.getElementById("f_producto").value;
+
+        // Cambiar diseño de cabecera según reporte
+        if (tipo === 'stock') {
+            titulo.innerText = "Stock Actual";
+            thead.innerHTML = '<tr><th>Producto</th><th>Estatus</th><th>Stock Actual</th><th>Precio</th></tr>';
+        } else if (tipo === 'alertas') {
+            titulo.innerText = "Alertas de Inventario";
+            thead.innerHTML = '<tr><th>Producto</th><th>Estado Actual</th><th>Stock</th><th>Mensaje</th></tr>';
+        } else {
+            titulo.innerText = tipo.charAt(0).toUpperCase() + tipo.slice(1);
+            thead.innerHTML = '<tr><th>Producto</th><th>Movimiento</th><th>Cantidad</th><th>Fecha</th><th>Usuario</th></tr>';
+        }
+
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center">Generando reporte...</td></tr>';
+
+        // Petición AJAX
+        fetch(`obtener_reporte.php?tipo=${tipo}&inicio=${inicio}&fin=${fin}&producto=${producto}`)
+            .then(response => response.text())
+            .then(data => {
+                tbody.innerHTML = data;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error al cargar datos</td></tr>';
+            });
+    }
+
+    // Manejador de clics en las tarjetas
+    document.querySelectorAll('.report-card').forEach(card => {
+        card.addEventListener('click', function() {
+            document.querySelectorAll('.report-card').forEach(c => c.classList.remove('active', 'border-primary'));
+            this.classList.add('active', 'border-primary');
+            
+            const tipo = this.getAttribute('data-tipo');
+            cargarReporte(tipo);
+        });
     });
-});
-</script>
+    </script>
+</body>
+</html>

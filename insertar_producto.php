@@ -2,32 +2,47 @@
 include 'conexion.php';
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $codigo = $_POST['codigo'];
-    $nombre = $_POST['nombre'];
-    $clasi  = $_POST['clasificacion'];
-    $impor  = $_POST['importancia'];
-    $valor  = $_POST['valor'];
-    $unidad = $_POST['unidad'];
-    $status = $_POST['estatus'];
+    // 1. Recoger datos del formulario
+    $id_clasificacion = $_POST['id_clasificacion'];
+    $clasificacion_abc = $_POST['clasificacion_abc'];
+    $valor = $_POST['valor'];
+    $estatus = $_POST['estatus'];
 
-    // 1. Insertar en tabla PRODUCTOS
-$sql = "INSERT INTO PRODUCTOS (VALOR_UNITARIO, ESTATUS, IDCLASIFICACION) VALUES (?, ?, ?)";
-$params = array($valor, $estatus, $id_clasificacion);       
+    // 2. Iniciar una transacción (Opcional pero recomendado)
+    // Usamos transacción porque insertaremos en dos tablas: PRODUCTOS e INVENTARIO
+    if (sqlsrv_begin_transaction($conn) === false) {
+        die(print_r(sqlsrv_errors(), true));
+    }
+
+    // 3. Insertar en la tabla PRODUCTOS
+    // Nota: SQL Server suele tener el IDPRODUCTO como IDENTITY (autoincrementable)
+    $sql_prod = "INSERT INTO PRODUCTOS (IDCLASIFICACION, VALOR_UNITARIO, ESTATUS, CLASIFICACION_ABC) 
+                 VALUES (?, ?, ?, ?); SELECT SCOPE_IDENTITY() AS id";
     
-    $params = array($codigo, $nombre, $clasi, $impor, $valor, $unidad, $status);
-    $stmt = sqlsrv_query($conn, $sql, $params);
+    $params_prod = array($id_clasificacion, $valor, $estatus, $clasificacion_abc);
+    $stmt_prod = sqlsrv_query($conn, $sql_prod, $params_prod);
 
-    if ($stmt) {
-        // Obtenemos el ID generado para crear su registro en INVENTARIO con stock 0
-        sqlsrv_next_result($stmt);
-        $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
-        $idNuevo = $row['id'];
+    if ($stmt_prod) {
+        // Obtenemos el ID del producto que se acaba de insertar
+        sqlsrv_next_result($stmt_prod); 
+        $row = sqlsrv_fetch_array($stmt_prod, SQLSRV_FETCH_ASSOC);
+        $nuevo_id = $row['id'];
 
-        $sqlInv = "INSERT INTO INVENTARIO (IDPRODUCTO, STOCK, STOCK_MINIMO) VALUES (?, 0, 5)";
-        sqlsrv_query($conn, $sqlInv, array($idNuevo));
+        // 4. Insertar en la tabla INVENTARIO (Inicializar stock en 0)
+        // Según tus capturas, INVENTARIO necesita IDPRODUCTO, STOCK y STOCK_MINIMO
+        $sql_inv = "INSERT INTO INVENTARIO (IDPRODUCTO, STOCK, STOCK_MINIMO) VALUES (?, ?, ?)";
+        $params_inv = array($nuevo_id, 0, 10); // 10 como stock mínimo por defecto
+        $stmt_inv = sqlsrv_query($conn, $sql_inv, $params_inv);
 
-        header("Location: productos.php?msj=ok");
+        if ($stmt_inv) {
+            sqlsrv_commit($conn); // Todo salió bien, guardamos cambios
+            header("Location: productos.php?msj=ok"); // Redirigir de vuelta
+        } else {
+            sqlsrv_rollback($conn); // Algo falló en inventario, deshacemos todo
+            die(print_r(sqlsrv_errors(), true));
+        }
     } else {
+        sqlsrv_rollback($conn); // Falló la inserción del producto
         die(print_r(sqlsrv_errors(), true));
     }
 }
