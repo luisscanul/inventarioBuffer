@@ -5,15 +5,18 @@ include 'conexion.php';
  * CONSULTA PARA LA TABLA (Con JOIN para el nombre de categoría y LEFT JOIN para stock)
  */
 $sql = "SELECT 
-            p.IDPRODUCTO, 
-            c.NOMBRE AS CATEGORIA_NOMBRE, 
-            p.VALOR_UNITARIO, 
-            p.ESTATUS, 
-            p.CLASIFICACION_ABC, 
-            i.STOCK 
-        FROM PRODUCTOS p 
-        INNER JOIN CLASIFICACIONES c ON p.IDCLASIFICACION = c.IDCLASIFICACION
-        LEFT JOIN INVENTARIO i ON p.IDPRODUCTO = i.IDPRODUCTO";
+            p.IDPRODUCTO,
+            p.NOMBRE AS PRODUCTO_NOMBRE,
+            c.NOMBRE AS CATEGORIA_NOMBRE,
+            p.VALOR_UNITARIO,
+            p.ESTATUS,
+            p.CLASIFICACION_ABC,
+            i.STOCK
+        FROM PRODUCTOS p
+        INNER JOIN CLASIFICACIONES c 
+            ON p.IDCLASIFICACION = c.IDCLASIFICACION
+        LEFT JOIN INVENTARIO i 
+            ON p.IDPRODUCTO = i.IDPRODUCTO";
 
 $res = sqlsrv_query($conn, $sql);
 
@@ -50,6 +53,10 @@ if ($res === false) {
             <h5 class="text-primary mb-3">Registro de Nuevo Producto</h5>
             <form action="insertar_producto.php" method="POST">
                 <div class="row g-3">
+                    <div class="col-md-5">
+                        <label class="form-label fw-bold">Nombre del Producto</label>
+                        <input type="text" name="nombre" class="form-control" required>
+                    </div>
                     <div class="col-md-5">
                         <label class="form-label fw-bold">Categoría</label>
                         <select name="id_clasificacion" class="form-select" required>
@@ -100,7 +107,8 @@ if ($res === false) {
                     <thead class="table-dark">
                         <tr>
                             <th>ID</th>
-                            <th>Nombre (Categoría)</th>
+                            <th>Producto</th>
+                            <th>Categoría</th>
                             <th>Valor Unitario</th>
                             <th class="text-center">ABC</th>
                             <th>Stock</th>
@@ -117,7 +125,13 @@ if ($res === false) {
                         ?>
                         <tr>
                             <td><small class="text-muted">#<?php echo $id; ?></small></td>
-                            <td><strong><?php echo $row['CATEGORIA_NOMBRE']; ?></strong></td>
+                            <td>
+                                <strong><?php echo $row['PRODUCTO_NOMBRE']; ?></strong>
+                            </td>
+
+                            <td>
+                                <?php echo $row['CATEGORIA_NOMBRE']; ?>
+                            </td>
                             <td>$<?php echo number_format($valor, 2); ?></td>
                             <td class="text-center">
                                 <span class="badge-abc abc-<?php echo $abc; ?>">
