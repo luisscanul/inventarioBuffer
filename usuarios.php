@@ -10,8 +10,17 @@ if (isset($_POST['btn_crear'])) {
     $telefono = $_POST['telefono'];
     $rol = $_POST['rol'];
 
-    $sql = "INSERT INTO USUARIOS (NOMBRE, CORREO, TELEFONO, ROL) VALUES (?, ?, ?, ?)";
-    $params = array($nombre, $correo, $telefono, $rol);
+    $password = $_POST['password'];
+    $sql = "INSERT INTO USUARIOS 
+            (NOMBRE, CORREO, TELEFONO, ROL, PASSWORD) 
+            VALUES (?, ?, ?, ?, ?)";
+    $params = array(
+    $nombre,
+    $correo,
+    $telefono,
+    $rol,
+    $password
+    );
     sqlsrv_query($conn, $sql, $params);
     header("Location: usuarios.php"); // Recargar para limpiar el POST
 }
@@ -34,8 +43,24 @@ if (isset($_POST['btn_editar'])) {
     $rol = $_POST['rol'];
 
     // Asegúrate de que los nombres de las columnas sean IDUSUARIO, NOMBRE, etc.
-    $sql = "UPDATE USUARIOS SET NOMBRE = ?, CORREO = ?, TELEFONO = ?, ROL = ? WHERE IDUSUARIO = ?";
-    $params = array($nombre, $correo, $telefono, $rol, $id);
+    $password = $_POST['password'];
+
+    $sql = "UPDATE USUARIOS 
+    SET NOMBRE = ?, 
+    CORREO = ?, 
+    TELEFONO = ?, 
+    ROL = ?, 
+    PASSWORD = ?
+    WHERE IDUSUARIO = ?";
+
+    $params = array(
+    $nombre,
+    $correo,
+    $telefono,
+    $rol,
+    $password,
+    $id
+    );
     
     $stmt = sqlsrv_query($conn, $sql, $params);
 
@@ -49,7 +74,9 @@ if (isset($_POST['btn_editar'])) {
 }
 
 // Consulta para listar
-$query = "SELECT IDUSUARIO, NOMBRE, ROL, CORREO, TELEFONO FROM USUARIOS ORDER BY NOMBRE ASC";
+$query = "SELECT IDUSUARIO, NOMBRE, ROL, CORREO, TELEFONO, PASSWORD
+FROM USUARIOS 
+ORDER BY NOMBRE ASC";
 $resultado = sqlsrv_query($conn, $query);
 ?>
 
@@ -90,6 +117,10 @@ $resultado = sqlsrv_query($conn, $query);
                         <option>Experto Almacén</option>
                     </select>
                 </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold">Contraseña</label>
+                    <input type="password" name="password" class="form-control" placeholder="Contraseña" required>
+                </div>
                 <div class="col-md-2 d-flex align-items-end">
                     <button type="submit" name="btn_crear" class="btn btn-success w-100 fw-bold">Crear usuario</button>
                 </div>
@@ -124,7 +155,13 @@ $resultado = sqlsrv_query($conn, $query);
                             <td><small>📞 <?php echo $fila['TELEFONO']; ?></small></td>
                             <td class="text-center">
                                 <button class="btn btn-sm btn-warning fw-bold" 
-    onclick="abrirModalEditar('<?php echo $fila['IDUSUARIO']; ?>', '<?php echo addslashes($fila['NOMBRE']); ?>', '<?php echo $fila['CORREO']; ?>', '<?php echo $fila['TELEFONO']; ?>', '<?php echo $fila['ROL']; ?>')">
+                                onclick="abrirModalEditar(
+                            '<?php echo $fila['IDUSUARIO']; ?>',
+                            '<?php echo addslashes($fila['NOMBRE']); ?>',
+                            '<?php echo $fila['CORREO']; ?>',
+                            '<?php echo $fila['TELEFONO']; ?>',
+                            '<?php echo $fila['ROL']; ?>',
+                            '<?php echo $fila['PASSWORD']; ?>')">
     Editar
 </button>
                                 
@@ -175,6 +212,10 @@ $resultado = sqlsrv_query($conn, $query);
                             <option value="Experto Almacén">Experto Almacén</option>
                         </select>
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Contraseña</label>
+                        <input type="password" name="password" id="edit_password" class="form-control" required>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
@@ -188,13 +229,14 @@ $resultado = sqlsrv_query($conn, $query);
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-    function abrirModalEditar(id, nombre, correo, tel, rol) {
+    function abrirModalEditar(id, nombre, correo, tel, rol,password) {
         // Llenamos los campos del formulario
         document.getElementById('edit_id').value = id;
         document.getElementById('edit_nombre').value = nombre;
         document.getElementById('edit_correo').value = correo;
         document.getElementById('edit_telefono').value = tel;
         document.getElementById('edit_rol').value = rol;
+        document.getElementById('edit_password').value = password;
         
         // 2. Intentamos abrir el modal de forma segura
         try {

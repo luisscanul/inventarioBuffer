@@ -48,7 +48,7 @@
 </li>
 
 <li class="nav-item">
-<a class="nav-link" href="login.php">Cerrar Sesión</a>
+<a class="nav-link" href="login.html">Cerrar Sesión</a>
 </li>
 
 </ul>

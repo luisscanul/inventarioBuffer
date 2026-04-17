@@ -1,41 +1,37 @@
-<!DOCTYPE html>
-<html lang="es">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<?php
 
-        <title>Inicio de Sesión</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-        <link rel="stylesheet" href="css/login.css">
-    </head>
-    <body>
-        <div class="login-box">
-        <div class="logo">
-        Sistema de Inventario
-        </div>
+include("conexion.php");
 
-        <form id="loginForm">
-        <div class="mb-3">
-        <label class="form-label">Usuario</label>
-        <input type="text" id="usuario" class="form-control" placeholder="Ingrese su usuario">
-        </div>
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
-        <div class="mb-3">
-        <label class="form-label">Contraseña</label>
-        <input type="password" id="password" class="form-control" placeholder="Ingrese su contraseña">
-        </div>
+$usuario = trim($_POST['usuario']);
+$password = trim($_POST['password']);
 
-        <div id="error" class="alert alert-warning error">
-        Usuario o contraseña incorrectos
-        </div>
+$sql = "SELECT COUNT(*) AS total
+        FROM USUARIOS
+        WHERE USUARIO = ?
+        AND PASSWORD = ?";
 
-        <div class="d-grid">
-        <button type="submit" class="btn btn-login">
-        Iniciar sesión
-        </button>
-        </div>
-        </form>
-        </div>
-        <script src="js/logins.js"></script>
-    </body>
-</html>
+$params = array($usuario, $password);
+
+$stmt = sqlsrv_query($conn, $sql, $params);
+
+if ($stmt === false) {
+die(print_r(sqlsrv_errors(), true));
+}
+
+$row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+
+if ($row['total'] > 0) {
+
+echo "OK";
+
+} else {
+
+echo "ERROR";
+
+}
+
+}
+
+?>
